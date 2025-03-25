@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Assistant Core Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@supabase/supabase-js"></script>
+</head>
+<body class="bg-gray-50 font-['Inter']">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm">
+            <nav class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="flex h-16 justify-between items-center">
+                    <div class="flex items-center">
+                        <i class="bi bi-database-fill text-blue-600 text-2xl mr-2"></i>
+                        <h1 class="text-xl font-semibold">SQL Assistant</h1>
+                    </div>
+                    <button id="settingsBtn" class="text-gray-600 hover:text-gray-900">
+                        <i class="bi bi-gear text-xl"></i>
+                    </button>
+                </div>
+            </nav>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <!-- Query Input Section -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <textarea id="queryInput" class="w-full h-32 p-4 border rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ask your question in natural language..."></textarea>
+                <div class="mt-4 flex justify-between items-center">
+                    <div class="flex items-center space-x-4">
+                        <select id="dbSelect" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Select Database</option>
+                        </select>
+                        <button id="syncSchemaBtn" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200">
+                            <i class="bi bi-arrow-repeat mr-2"></i>Sync Schema
+                        </button>
+                    </div>
+                    <button id="generateBtn" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                        Generate SQL
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="mb-4">
+                    <h2 class="text-lg font-semibold mb-2">Generated SQL</h2>
+                    <pre id="sqlOutput" class="bg-gray-50 p-4 rounded-lg text-sm font-mono"></pre>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold mb-2">Sample Results</h2>
+                    <div id="resultTable" class="overflow-x-auto">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+            <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">Settings</h3>
+                    <button id="closeSettingsBtn" class="text-gray-600 hover:text-gray-900">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <div class="space-y-6">
+                    <!-- OpenAI Key Section -->
+                    <div>
+                        <h4 class="font-medium mb-2">OpenAI API Key</h4>
+                        <input type="password" id="openaiKey" class="w-full p-2 border rounded-md" placeholder="Enter OpenAI API Key">
+                    </div>
+                    <!-- Database Connections -->
+                    <div>
+                        <h4 class="font-medium mb-2">Database Connections</h4>
+                        <div id="dbConnections" class="space-y-4">
+                            <!-- Connection forms will be added here -->
+                        </div>
+                        <button id="addDbBtn" class="mt-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200">
+                            <i class="bi bi-plus-lg mr-2"></i>Add Connection
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize UI components
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            document.getElementById('settingsModal').classList.remove('hidden');
+        });
+
+        document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+            document.getElementById('settingsModal').classList.add('hidden');
+        });
+
+        // Sample database connection form template
+        const addDbConnection = () => {
+            const template = `
+                <div class="p-4 border rounded-md">
+                    <div class="grid grid-cols-2 gap-4">
+                        <input type="text" placeholder="Connection Name" class="p-2 border rounded-md">
+                        <select class="p-2 border rounded-md">
+                            <option value="postgresql">PostgreSQL</option>
+                            <option value="mysql">MySQL</option>
+                            <option value="supabase">Supabase</option>
+                        </select>
+                        <input type="text" placeholder="Database URL" class="p-2 border rounded-md col-span-2">
+                        <input type="password" placeholder="Database Key" class="p-2 border rounded-md col-span-2">
+                    </div>
+                    <div class="mt-4 flex justify-end">
+                        <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Test Connection</button>
+                    </div>
+                </div>
+            `;
+            const container = document.getElementById('dbConnections');
+            container.insertAdjacentHTML('beforeend', template);
+        };
+
+        document.getElementById('addDbBtn').addEventListener('click', addDbConnection);
+
+        // Generate SQL button click handler
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            const userQuestion = document.getElementById('queryInput').value;
+            // Simulate SQL generation (in real app, this would call your backend)
+            const sampleSQL = `SELECT 
+    orders.order_id,
+    orders.order_date,
+    products.product_name,
+    products.category
+FROM orders
+JOIN products ON orders.product_id = products.product_id
+WHERE orders.is_active = true
+    AND orders.region = 'US-East'
+LIMIT 10;`;
+            
+            document.getElementById('sqlOutput').textContent = sampleSQL;
+        });
+
+        // Add initial DB connection form
+        addDbConnection();
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
